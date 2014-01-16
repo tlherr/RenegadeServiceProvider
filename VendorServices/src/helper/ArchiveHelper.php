@@ -1,7 +1,7 @@
 <?php
 
 
-namespace renegade\helper;
+namespace Renegade\VendorServices\Helper;
 
 use ZipArchive;
 

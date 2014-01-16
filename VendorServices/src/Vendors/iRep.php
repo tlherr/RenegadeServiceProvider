@@ -1,8 +1,9 @@
 <?php
 
-namespace renegade\services\irep;
+namespace Renegade\VendorServices\Vendors;
 
-use renegade\RenegadeServiceInterface;
+use Renegade\VendorServices\RenegadeServiceInterface;
+use Symfony\Component\Console\Helper\ProgressHelper;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
@@ -20,9 +21,9 @@ class iRep implements RenegadeServiceInterface {
         init($app, $input->getOption('lang'), 'build');
 
         $this->output->writeln(success_message(sprintf("* Scanning for template files matching language type: %s", $input->getOption('lang'))));
-        $directory = new RecursiveDirectoryIterator(sprintf('%s/%s/pages', $app['twig.path'], $input->getOption('lang')));
-        $iterator = new RecursiveIteratorIterator($directory);
-        $iterator->setFlags(RecursiveDirectoryIterator::SKIP_DOTS);
+        $directory = new \RecursiveDirectoryIterator(sprintf('%s/%s/pages', $app['twig.path'], $input->getOption('lang')));
+        $iterator = new \RecursiveIteratorIterator($directory);
+        $iterator->setFlags(\RecursiveDirectoryIterator::SKIP_DOTS);
 
         /**
          * @var $progress ProgressHelper

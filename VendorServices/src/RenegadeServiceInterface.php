@@ -1,6 +1,6 @@
 <?php
 
-namespace renegade;
+namespace Renegade\VendorServices;
 
 /**
  * Interface RenegadeServiceInterface

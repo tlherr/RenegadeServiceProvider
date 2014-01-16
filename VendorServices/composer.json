@@ -20,8 +20,5 @@
             "Renegade\\VendorServices\\": "src"
         },
         "classmap": ["src/"]
-    },
-    "bin": [
-        "bin/phantomjs"
-    ]
+    }
 }

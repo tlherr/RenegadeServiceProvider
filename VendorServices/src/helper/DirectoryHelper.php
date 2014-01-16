@@ -1,8 +1,6 @@
 <?php
 
-
-namespace renegade\helper;
-
+namespace Renegade\VendorServices\Helper;
 
 use Symfony\Component\Filesystem\Filesystem;
 

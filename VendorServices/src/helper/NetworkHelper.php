@@ -1,6 +1,6 @@
 <?php
 
-namespace renegade\helper;
+namespace Renegade\VendorServices\Helper;
 
 class NetworkHelper {
 

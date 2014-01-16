@@ -1,15 +1,8 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: Tom
- * Date: 16/01/2014
- * Time: 15:22
- */
 
-namespace renegade;
+namespace Renegade\VendorServices;
 
-
-use renegade\services\iRep;
+use renegade\services\irep\iRep;
 use Silex\Application;
 use Silex\ServiceProviderInterface;
 
