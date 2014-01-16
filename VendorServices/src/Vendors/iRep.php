@@ -2,186 +2,195 @@
 
 namespace Renegade\VendorServices\Vendors;
 
+use JonnyW\PhantomJs\Client;
+use Renegade\VendorServices\Helper\ArchiveHelper;
+use Renegade\VendorServices\Helper\DirectoryHelper;
+use Renegade\VendorServices\Helper\MessagesHelper;
+use Renegade\VendorServices\Helper\NetworkHelper;
 use Renegade\VendorServices\RenegadeServiceInterface;
 use Symfony\Component\Console\Helper\ProgressHelper;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use DirectoryIterator;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use DOMDocument;
+use DOMElement;
+use Symfony\Component\Filesystem\Filesystem;
 
 class iRep implements RenegadeServiceInterface {
 
     protected $input;
     protected $output;
+    protected $filesystem;
+    protected $phantomJS;
+    protected $tcpdf;
+    protected $config;
+    protected $directory;
+    protected $twig;
 
-    public function __construct(InputInterface $input, OutputInterface $output) {
+    public $archiveHelper;
+    public $directoryHelper;
+    public $messagesHelper;
+    public $networkHelper;
+
+    /**
+     * @param InputInterface $input
+     * @param OutputInterface $output
+     * @param $twig
+     * @param \Symfony\Component\Filesystem\Filesystem $filesystem
+     * @param \JonnyW\PhantomJs\Client $phantomJS
+     * @param \TCPDF $tcpdf
+     * @param $config
+     * @param $directory                string      Application Path (console.php location)
+     * @internal param $phantomJS
+     */
+    public function __construct(InputInterface $input, OutputInterface $output, $twig, Filesystem $filesystem, Client $phantomJS, \TCPDF $tcpdf, $config, $directory) {
         $this->input = $input;
         $this->output = $output;
+        $this->twig = $twig;
+        $this->filesystem = $filesystem;
+        $this->phantomJS = $phantomJS;
+        $this->tcpdf = $tcpdf;
+        $this->config = $config;
+        $this->directory = $directory;
+
+        $this->archiveHelper = new ArchiveHelper();
+        $this->directoryHelper = new DirectoryHelper($filesystem, $config);
+        $this->messagesHelper = new MessagesHelper();
+        $this->networkHelper = new NetworkHelper();
     }
 
     public function build() {
-        init($app, $input->getOption('lang'), 'build');
+        $this->directoryHelper->init($this->input->getOption('lang'), 'build');
 
-        $this->output->writeln(success_message(sprintf("* Scanning for template files matching language type: %s", $input->getOption('lang'))));
-        $directory = new \RecursiveDirectoryIterator(sprintf('%s/%s/pages', $app['twig.path'], $input->getOption('lang')));
-        $iterator = new \RecursiveIteratorIterator($directory);
-        $iterator->setFlags(\RecursiveDirectoryIterator::SKIP_DOTS);
-
+        $this->output->writeln($this->messagesHelper->success_message(sprintf("* Scanning for template files matching language type: %s", $this->input->getOption('lang'))));
+        $directory = new RecursiveDirectoryIterator(sprintf('%s/views/%s/pages', $this->directory, $this->input->getOption('lang')));
+        $iterator = new RecursiveIteratorIterator($directory);
         /**
-         * @var $progress ProgressHelper
+         * @var $iterator RecursiveIteratorIterator
          */
-        $progress = $console->getHelperSet()->get('progress');
-        $progress->setFormat(ProgressHelper::FORMAT_VERBOSE_NOMAX);
-        $progress->start($this->output);
-
-        /**
-         * @var $fs Filesystem
-         */
-        $fs = $app['filesystem'];
+        $iterator->setFlags(RecursiveDirectoryIterator::SKIP_DOTS);
 
         foreach($iterator as $template_file) {
             /**
              * @var $template_file DirectoryIterator
              */
 
-            $sub_dir = sprintf('%s/%s', get_localized_dir($app, 'build', $input->getOption('lang')), $template_file->getBasename('.html.twig'));
-            $fs->mkdir($sub_dir);
+            $sub_dir = sprintf('%s/%s', $this->directoryHelper->get_localized_dir('build', $this->input->getOption('lang')), $template_file->getBasename('.html.twig'));
+            $this->filesystem->mkdir($sub_dir);
 
-            if(save_page(
-                $app['twig']->render(sprintf('/%s/pages/%s', $input->getOption('lang'), $template_file->getFileInfo()->getFilename()), array(
-                        'is_relative' => $input->getOption('assets_relative'),
+            $this->directoryHelper->save_page(
+                $this->twig->render(sprintf('/%s/pages/%s', $this->input->getOption('lang'), $template_file->getFileInfo()->getFilename()), array(
+                        'is_relative' => $this->input->getOption('assets_relative'),
                         'page_number' => preg_match('/slide([\d]+)/', $template_file->getFileInfo()->getFilename()),
-                        'prefix' => sprintf('%s_remicade_derm_indication_slide', strtolower($input->getOption('lang')))
+                        'prefix' => sprintf('%s_remicade_derm_indication_slide', strtolower($this->input->getOption('lang')))
                     )
                 ),
                 $sub_dir,
-                $template_file->getBasename('.twig'))
-            ) {
-                $progress->advance();
-            }
+                $template_file->getBasename('.twig')
+            );
 
-            $this->output->writeln(PHP_EOL.success_message(sprintf('Searching document: [%s] for resources', $template_file->getFilename())));
-            $doc = new DOMDocument();
+
+            $this->output->writeln($this->messagesHelper->success_message(sprintf('Searching document: [%s] for resources', $template_file->getFilename())));
+            $doc = new \DOMDocument();
             $doc->loadHTMLFile(sprintf('%s/%s', $sub_dir, $template_file->getBasename('.twig')));
 
             /**
              * Copy CSS
              */
-            $fs->mkdir(sprintf('%s/%s', $sub_dir, 'css'));
+            $this->filesystem->mkdir(sprintf('%s/%s', $sub_dir, 'css'));
             $linkTags = $doc->getElementsByTagName('link');
-            $this->output->writeln(notification_message(sprintf('Found %s css resources', count($linkTags))));
+            $this->output->writeln($this->messagesHelper->notification_message(sprintf('Found %s css resources', count($linkTags))));
             foreach($linkTags as $tag) {
                 /**
                  * @var $tag DOMElement
                  */
-                $this->output->writeln(notification_message(sprintf('Moving %s from %s to %s/%s', $tag->getAttribute('href'), __DIR__, $sub_dir, $tag->getAttribute('href'))));
-                $fs->copy(sprintf('%s/%s', __DIR__, $tag->getAttribute('href')), sprintf('%s/%s', $sub_dir, $tag->getAttribute('href')));
+                $this->output->writeln($this->messagesHelper->notification_message(sprintf('Moving %s from %s to %s/%s', $tag->getAttribute('href'), $this->directory, $sub_dir, $tag->getAttribute('href'))));
+                $this->filesystem->copy(sprintf('%s/%s', $this->directory, $tag->getAttribute('href')), sprintf('%s/%s', $sub_dir, $tag->getAttribute('href')));
             }
 
             /**
              * Copy JS
              */
-            $fs->mkdir(sprintf('%s/%s', $sub_dir, 'js'));
+            $this->filesystem->mkdir(sprintf('%s/%s', $sub_dir, 'js'));
             $scriptTags = $doc->getElementsByTagName('script');
-            $this->output->writeln(notification_message(sprintf('Found %s js resources', count($scriptTags))));
+            $this->output->writeln($this->messagesHelper->notification_message(sprintf('Found %s js resources', count($scriptTags))));
 
             foreach($scriptTags as $tag) {
                 /**
                  * @var $tag DOMElement
                  */
-                $this->output->writeln(notification_message(sprintf('Moving %s from %s to %s/%s', $tag->getAttribute('src'), __DIR__, $sub_dir, $tag->getAttribute('src'))));
-                $fs->copy(sprintf('%s/%s', __DIR__, $tag->getAttribute('src')), sprintf('%s/%s', $sub_dir, $tag->getAttribute('src')));
+                $this->output->writeln($this->messagesHelper->notification_message(sprintf('Moving %s from %s to %s/%s', $tag->getAttribute('src'), $this->directory, $sub_dir, $tag->getAttribute('src'))));
+                $this->filesystem->copy(sprintf('%s/%s', $this->directory, $tag->getAttribute('src')), sprintf('%s/%s', $sub_dir, $tag->getAttribute('src')));
             }
 
             /**
              * Copy Fonts
              */
-            $fs->mkdir(sprintf('%s/%s', $sub_dir, 'fonts'));
-            $fs->mirror(sprintf('%s/%s', __DIR__, 'fonts'), sprintf('%s/%s', $sub_dir, 'fonts'));
+            $this->filesystem->mkdir(sprintf('%s/%s', $sub_dir, 'fonts'));
+            $this->filesystem->mirror(sprintf('%s/%s', $this->directory, 'fonts'), sprintf('%s/%s', $sub_dir, 'fonts'));
 
             /**
              * Copy Images
              */
-            $fs->mkdir(sprintf('%s/%s', $sub_dir, 'img'));
+            $this->filesystem->mkdir(sprintf('%s/%s', $sub_dir, 'img'));
             $imageTags = $doc->getElementsByTagName('img');
-            $this->output->writeln(notification_message(sprintf('Found %s img resources', count($imageTags))));
+            $this->output->writeln($this->messagesHelper->notification_message(sprintf('Found %s img resources', count($imageTags))));
 
             foreach($imageTags as $tag) {
                 /**
                  * @var $tag DOMElement
                  */
-                $this->output->writeln(notification_message(sprintf('Moving %s from %s to %s/%s', $tag->getAttribute('src'), __DIR__, $sub_dir, $tag->getAttribute('src'))));
-                $fs->copy(sprintf('%s/%s', __DIR__, $tag->getAttribute('src')), sprintf('%s/%s', $sub_dir, $tag->getAttribute('src')));
+                $this->output->writeln($this->messagesHelper->notification_message(sprintf('Moving %s from %s to %s/%s', $tag->getAttribute('src'), $this->directory, $sub_dir, $tag->getAttribute('src'))));
+                $this->filesystem->copy(sprintf('%s/%s', $this->directory, $tag->getAttribute('src')), sprintf('%s/%s', $sub_dir, $tag->getAttribute('src')));
             }
 
-            $fs->copy(sprintf('%s/img/header.jpg', __DIR__), sprintf('%s/img/header.jpg', $sub_dir));
-            $fs->copy(sprintf('%s/img/footer.png', __DIR__), sprintf('%s/img/footer.png', $sub_dir));
+            $this->filesystem->copy(sprintf('%s/img/header.jpg', $this->directory), sprintf('%s/img/header.jpg', $sub_dir));
+            $this->filesystem->copy(sprintf('%s/img/footer.png', $this->directory), sprintf('%s/img/footer.png', $sub_dir));
         }
 
-        $progress->finish();
-        $this->output->writeln(success_message('Build Completed'));
+        $this->output->writeln($this->messagesHelper->success_message('Build Completed'));
     }
 
     public function screenshot() {
-        init($app, $input->getOption('lang'), 'screenshots');
+        $this->directoryHelper->init($this->input->getOption('lang'), 'screenshots');
 
-        $directory = new RecursiveDirectoryIterator(sprintf('%s/%s/pages', $app['twig.path'], $input->getOption('lang')));
+        $directory = new RecursiveDirectoryIterator(sprintf('%s/views/%s/pages', $this->directory, $this->input->getOption('lang')));
         $iterator = new RecursiveIteratorIterator($directory);
         $iterator->setFlags(RecursiveDirectoryIterator::SKIP_DOTS);
 
-        $baseUrl =  $app['config']['application']['url'];
-        /**
-         * @var $progress ProgressHelper
-         */
-        $progress = $console->getHelperSet()->get('progress');
-        $progress->setFormat(ProgressHelper::FORMAT_VERBOSE_NOMAX);
-        $progress->start($this->output);
-
-        if(!isDomainAvailible(sprintf( 'http://%s', $baseUrl))) {
-            throw new Exception('URL Unavailable to screenshot');
+        if(!$this->networkHelper->isDomainAvailible(sprintf( 'http://%s', $this->config['url']))) {
+            throw new \Exception('URL Unavailable to screenshot');
         }
 
         foreach($iterator as $fileInfo) {
             /**
              * @var $fileInfo DirectoryIterator
              */
-            $client = Client::getInstance();
-            $client->setPhantomJs($app['config']['application']['phantomjs_bin']);
-
-            /**
-             * @see JonnyW\PhantomJs\Message\Request
-             **/
-            $request = $client->getMessageFactory()->createRequest('GET', sprintf( 'http://%s/screenshot/%s/%s', $baseUrl, $input->getOption('lang'), $fileInfo->getFilename()));
-
-            /**
-             * @see JonnyW\PhantomJs\Message\Response
-             **/
+            $client = $this->phantomJS;
+            $client->setPhantomJs($this->config['phantomjs_bin']);
+            $request = $client->getMessageFactory()->createRequest('GET', sprintf( 'http://%s/screenshot/%s/%s', $this->config['url'], $this->input->getOption('lang'), $fileInfo->getFilename()));
             $response = $client->getMessageFactory()->createResponse();
-            $client->send($request, $response, sprintf('%s/%s.png', get_localized_dir($app, 'screenshots', $input->getOption('lang')), $fileInfo->getBasename('.html')));
-            $progress->advance();
+            $client->send($request, $response, sprintf('%s/%s.png', $this->directoryHelper->get_localized_dir('screenshots', $this->input->getOption('lang')), $fileInfo->getBasename('.html')));
         }
-        $progress->finish();
+        $this->output->writeln($this->messagesHelper->success_message('Operation Complete'));
     }
 
     public function pdf() {
-        init($app, $input->getOption('lang'), 'pdf');
+        $this->directoryHelper->init($this->input->getOption('lang'), 'pdf');
 
-        $file = sprintf('%s/%s-%s-pdf.pdf', get_localized_dir($app, 'pdf', $input->getOption('lang')), $input->getOption('lang'), time());
-        $directory = get_localized_dir($app, 'screenshots', $input->getOption('lang'));
+        $file = sprintf('%s/%s-%s-pdf.pdf', $this->directoryHelper->get_localized_dir('pdf', $this->input->getOption('lang')), $this->input->getOption('lang'), time());
+        $directory = $this->directoryHelper->get_localized_dir('screenshots', $this->input->getOption('lang'));
         $iterator = new DirectoryIterator($directory);
 
         /**
-         * @var $progress ProgressHelper
+         * @var $pdf \TCPDF
          */
-        $progress = $console->getHelperSet()->get('progress');
-        $progress->setFormat(ProgressHelper::FORMAT_VERBOSE_NOMAX);
-        $progress->start($this->output);
-
-        $pdf = new TCPDF('L', PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+        $pdf = $this->tcpdf('L', PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
         $pdf->SetCreator('Renegade Digital Media Inc.');
         $pdf->SetAuthor('Renegade Digital Media Inc.');
-        $pdf->SetTitle(sprintf('%s-%s', $input->getOption('lang'), time()));
-        $pdf->SetSubject(sprintf('%s-%s', APP_NAME, APP_VERSION));
-        $pdf->SetKeywords(APP_NAME);
-
+        $pdf->SetTitle(sprintf('%s-%s', $this->input->getOption('lang'), time()));
         $pdf->setPrintFooter(false);
         $pdf->setPrintHeader(false);
         $pdf->setHeaderFont(Array(PDF_FONT_NAME_MAIN, '', PDF_FONT_SIZE_MAIN));
@@ -205,47 +214,36 @@ class iRep implements RenegadeServiceInterface {
                 $pdf->setPageMark();
                 $pdf->writeHTML('&nbsp;', true, false, true, false, '');
 
-                $this->output->writeln(success_message(sprintf('  Image: %s added to pdf!', $fileInfo->getFilename())));
-                $progress->advance();
+                $this->output->writeln($this->messagesHelper->success_message(sprintf('  Image: %s added to pdf!', $fileInfo->getFilename())));
             }
         }
 
-        $progress->finish();
-        $this->output->writeln(success_message(sprintf('Saving PDF to file %s', $file)));
+        $this->output->writeln($this->messagesHelper->success_message(sprintf('Saving PDF to file %s', $file)));
         $pdf->Output($file , 'F');
 
         if(filesize($file)) {
-            $this->output->writeln(success_message('Operation Successful!'));
+            $this->output->writeln($this->messagesHelper->success_message('Operation Successful!'));
         }
     }
 
     public function package() {
-        init($app, $input->getOption('lang'), 'dist');
+        $this->directoryHelper->init($this->input->getOption('lang'), 'dist');
 
-        $this->output->writeln(success_message(sprintf("* Scanning for template files matching language type: %s", $input->getOption('lang'))));
-        $iterator = new RecursiveDirectoryIterator(get_localized_dir($app, 'build', $input->getOption('lang')));
+        $this->output->writeln($this->messagesHelper->success_message(sprintf("* Scanning for template files matching language type: %s", $this->input->getOption('lang'))));
+        $iterator = new RecursiveDirectoryIterator($this->directoryHelper->get_localized_dir('build', $this->input->getOption('lang')));
         $iterator->setFlags(RecursiveDirectoryIterator::SKIP_DOTS);
 
-        /**
-         * @var $progress ProgressHelper
-         */
-        $progress = $console->getHelperSet()->get('progress');
-        $progress->setFormat(ProgressHelper::FORMAT_VERBOSE_NOMAX);
-        $progress->start($this->output);
-
-        $zip = new ZipArchive();
+        $zip = new ArchiveHelper();
 
         foreach($iterator as $directory) {
             /**
              * @var $directory DirectoryIterator
              */
-            $zip->open(sprintf('%s/%s.zip', get_localized_dir($app, 'dist', $input->getOption('lang')), $directory->getFilename()), ZipArchive::CREATE);
-            folderToZip($directory->getRealPath(), $zip);
+            $zip->open(sprintf('%s/%s.zip', $this->directoryHelper->get_localized_dir('dist', $this->input->getOption('lang')), $directory->getFilename()), ArchiveHelper::CREATE);
+            $zip->folderToZip($directory->getRealPath(), $zip);
             $zip->close();
-
-            $progress->advance();
         }
-        $progress->finish();
+        $this->output->writeln($this->messagesHelper->success_message('Operation Successful!'));
     }
 
 } 
