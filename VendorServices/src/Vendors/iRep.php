@@ -20,8 +20,7 @@ use Symfony\Component\Filesystem\Filesystem;
 
 class iRep implements RenegadeServiceInterface {
 
-    protected $input;
-    protected $output;
+    protected $console;
     protected $filesystem;
     protected $phantomJS;
     protected $tcpdf;
@@ -35,15 +34,16 @@ class iRep implements RenegadeServiceInterface {
     public $networkHelper;
 
     /**
+     * @param $console
      * @param $twig
      * @param \Symfony\Component\Filesystem\Filesystem $filesystem
      * @param \JonnyW\PhantomJs\Client $phantomJS
      * @param \TCPDF $tcpdf
      * @param $config
      * @param $directory                string      Application Path (console.php location)
-     * @internal param $phantomJS
      */
-    public function __construct($twig, Filesystem $filesystem, Client $phantomJS, \TCPDF $tcpdf, $config, $directory) {
+    public function __construct($console, $twig, Filesystem $filesystem, Client $phantomJS, \TCPDF $tcpdf, $config, $directory) {
+        $this->console = $console;
         $this->twig = $twig;
         $this->filesystem = $filesystem;
         $this->phantomJS = $phantomJS;
@@ -67,6 +67,13 @@ class iRep implements RenegadeServiceInterface {
          * @var $iterator RecursiveIteratorIterator
          */
         $iterator->setFlags(RecursiveDirectoryIterator::SKIP_DOTS);
+
+        /**
+         * @var $progress ProgressHelper
+         */
+        $progress = $this->console->getHelperSet()->get('progress');
+        $progress->setFormat(ProgressHelper::FORMAT_VERBOSE_NOMAX);
+        $progress->start($output);
 
         foreach($iterator as $template_file) {
             /**
@@ -144,8 +151,10 @@ class iRep implements RenegadeServiceInterface {
 
             $this->filesystem->copy(sprintf('%s/img/header.jpg', $this->directory), sprintf('%s/img/header.jpg', $sub_dir));
             $this->filesystem->copy(sprintf('%s/img/footer.png', $this->directory), sprintf('%s/img/footer.png', $sub_dir));
-        }
 
+            $progress->advance();
+        }
+        $progress->finish();
         $output->writeln($this->messagesHelper->success_message('Build Completed'));
     }
 
