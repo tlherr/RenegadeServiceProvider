@@ -2,17 +2,15 @@
 
 namespace Renegade\VendorServices;
 
-use renegade\services\irep\iRep;
+use Renegade\VendorServices\Vendors\iRep;
 use Silex\Application;
 use Silex\ServiceProviderInterface;
 
+//(InputInterface $input, OutputInterface $output, $twig, Filesystem $filesystem, Client $phantomJS, \TCPDF $tcpdf, $config, $directory)
+
 class RenegadeServiceProvider implements ServiceProviderInterface {
     public function register(Application $app) {
-        $app['renegade'] = array();
-        $app['renegade']['irep'] = $app->share(function ($app) {
-            $app->flush();
-            return new iRep();
-        });
+        return new iRep();
     }
 
     public function boot(Application $app) {}
