@@ -165,7 +165,7 @@ class iRep implements RenegadeServiceInterface {
         $iterator = new RecursiveIteratorIterator($directory);
         $iterator->setFlags(RecursiveDirectoryIterator::SKIP_DOTS);
 
-        if(!$this->networkHelper->isDomainAvailible(sprintf( 'http://%s', $this->config['url']))) {
+        if(!$this->networkHelper->isDomainAvailible(sprintf( 'http://%s', $this->config['application']['url']))) {
             throw new \Exception('URL Unavailable to screenshot');
         }
 
@@ -174,8 +174,8 @@ class iRep implements RenegadeServiceInterface {
              * @var $fileInfo DirectoryIterator
              */
             $client = $this->phantomJS;
-            $client->setPhantomJs($this->config['phantomjs_bin']);
-            $request = $client->getMessageFactory()->createRequest('GET', sprintf( 'http://%s/screenshot/%s/%s', $this->config['url'], $input->getOption('lang'), $fileInfo->getFilename()));
+            $client->setPhantomJs($this->config['application']['phantomjs_bin']);
+            $request = $client->getMessageFactory()->createRequest('GET', sprintf( 'http://%s/screenshot/%s/%s', $this->config['application']['url'], $input->getOption('lang'), $fileInfo->getFilename()));
             $response = $client->getMessageFactory()->createResponse();
             $client->send($request, $response, sprintf('%s/%s.png', $this->directoryHelper->get_localized_dir('screenshots', $input->getOption('lang')), $fileInfo->getBasename('.html')));
         }
