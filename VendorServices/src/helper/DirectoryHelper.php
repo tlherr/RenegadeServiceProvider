@@ -10,16 +10,18 @@ class DirectoryHelper {
      * @var $filesystem \Symfony\Component\Filesystem\Filesystem
      */
     protected $filesystem;
-
     protected $config;
+    protected $directory;
 
     /**
      * @param Filesystem $filesystem
      * @param $config
+     * @param $directory
      */
-    function __construct(Filesystem $filesystem, $config) {
+    function __construct(Filesystem $filesystem, $config, $directory) {
         $this->filesystem = $filesystem;
         $this->config = $config;
+        $this->directory = $directory;
     }
 
     /**
@@ -61,19 +63,19 @@ class DirectoryHelper {
     function get_dir($type) {
         switch($type) {
             case 'build':
-                return sprintf('%s/%s', __DIR__, $this->config['application']['build_dir']);
+                return sprintf('%s/%s', $this->directory, $this->config['application']['build_dir']);
                 break;
 
             case 'dist':
-                return sprintf('%s/%s', __DIR__, $this->config['application']['dist_dir']);
+                return sprintf('%s/%s', $this->directory, $this->config['application']['dist_dir']);
                 break;
 
             case 'screenshots':
-                return sprintf('%s/%s', __DIR__, $this->config['application']['screenshots_dir']);
+                return sprintf('%s/%s', $this->directory, $this->config['application']['screenshots_dir']);
                 break;
 
             case 'pdf':
-                return sprintf('%s/%s', __DIR__, $this->config['application']['pdf_dir']);
+                return sprintf('%s/%s', $this->directory, $this->config['application']['pdf_dir']);
                 break;
         }
     }
