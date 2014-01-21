@@ -192,7 +192,7 @@ class iRep implements RenegadeServiceInterface {
         /**
          * @var $pdf \TCPDF
          */
-        $pdf = $this->tcpdf('L', PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+        $pdf = new $this->tcpdf('L', PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
         $pdf->SetCreator('Renegade Digital Media Inc.');
         $pdf->SetAuthor('Renegade Digital Media Inc.');
         $pdf->SetTitle(sprintf('%s-%s', $input->getOption('lang'), time()));
