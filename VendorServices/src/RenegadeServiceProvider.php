@@ -6,14 +6,10 @@ use Renegade\VendorServices\Vendors\iRep;
 use Silex\Application;
 use Silex\ServiceProviderInterface;
 
-//($twig, Filesystem $filesystem, Client $phantomJS, \TCPDF $tcpdf, $config, $directory)
-
 class RenegadeServiceProvider implements ServiceProviderInterface {
     public function register(Application $app) {
-        $app['renegade'] = array();
-        $app['renegade']['irep'] = $app->share(function($app) {
-            return new iRep($app['console'], $app['filesystem'], $app['twig'], $app['phantomjs'], $app['tcpdf'], $app['config'], $app['directory']);
-        });
+        $app['renegade_irep'] =  new iRep($app['console'], $app['twig'],  $app['filesystem'], $app['phantomjs'], $app['tcpdf'], $app['config'], $app['directory']);
+        return $app;
     }
 
     public function boot(Application $app) {}
