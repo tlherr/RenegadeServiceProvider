@@ -240,6 +240,13 @@ class iRep implements RenegadeServiceInterface {
 
         $zip = new ArchiveHelper();
 
+        /**
+         * @var $progress ProgressHelper
+         */
+        $progress = $this->console->getHelperSet()->get('progress');
+        $progress->setFormat(ProgressHelper::FORMAT_VERBOSE_NOMAX);
+        $progress->start($output);
+
         foreach($iterator as $directory) {
             /**
              * @var $directory DirectoryIterator
@@ -247,7 +254,9 @@ class iRep implements RenegadeServiceInterface {
             $zip->open(sprintf('%s/%s.zip', $this->directoryHelper->get_localized_dir('dist', $input->getOption('lang')), $directory->getFilename()), ArchiveHelper::CREATE);
             $zip->folderToZip($directory->getRealPath(), $zip);
             $zip->close();
+            $progress->advance();
         }
+        $progress->finish();
         $output->writeln($this->messagesHelper->success_message('Operation Successful!'));
     }
 
