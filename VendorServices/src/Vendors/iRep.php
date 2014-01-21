@@ -52,7 +52,7 @@ class iRep implements RenegadeServiceInterface {
         $this->directory = $directory;
 
         $this->archiveHelper = new ArchiveHelper();
-        $this->directoryHelper = new DirectoryHelper($filesystem, $config);
+        $this->directoryHelper = new DirectoryHelper($filesystem, $config, $directory);
         $this->messagesHelper = new MessagesHelper();
         $this->networkHelper = new NetworkHelper();
     }
